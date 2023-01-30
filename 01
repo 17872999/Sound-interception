@@ -1,0 +1,49 @@
+import wave
+import os
+import time
+import pandas as pd
+
+f_0='./原始音频/'   #原始音频存放文件夹
+f_p='./音频缓存/'    #转化音频存放文件夹
+f_k='./截取参数/'
+f_s='./运行结果/'    #截断音频存放文件夹
+sox_path="D:\sox\sox-14-4-2\sox.exe"
+abs_path=os.path.dirname(os.path.abspath(__file__))
+cmd='cd /d {}{} && for %i in (*.wav) do {} %i -b 16 -e signed-integer {}{}%i'.format(abs_path,f_0.replace('.',''),sox_path,abs_path,f_p.replace('.',''))  #shell脚本，解决wave初始非pcm格式问题
+os.system(cmd)
+t_0=time.time()
+x_0=os.listdir(f_0)   #获取音频文件名称列表，已含后缀
+t_p=[f_p+i for i in x_0]  #生成转化音频文件夹内文件的完整路径列表
+df=pd.read_excel(f_k+os.listdir(f_k)[0],sheet_name='参数表',header=0,keep_default_na=False)
+name_list=[list(df['Music_Name'])[i] +'-'+list(df['Artist'])[i]+'_'+list(df['Album'])[i] for i in range(len(df))]
+
+#转化读取到的时分秒数据
+def get_s_time(h,m,s):
+    s_time=h*3600+m*60+s
+    return s_time
+
+#主函数
+def cut_voice(stream,name,t_begin,t_end):
+    wf = wave.open(stream, 'rb')
+    nchannels, sampwidth, framerate, nframes = wf.getparams()[:4]
+    strData = wf.readframes(nframes)  # 读取音频，字符串格式
+    t_s = nframes / framerate
+    cut_data = strData[int(t_begin * len(strData)/t_s):int(t_end * len(strData)/t_s)]
+    wf.close()
+
+    outfile = f_s + name+'.wav'  # 定义存储路径以及文件名
+    outwave = wave.open(outfile, 'wb')
+    comptype = "NONE"
+    compname = "not compressed"
+    outwave.setparams((nchannels, sampwidth, framerate, nframes==int(len(cut_data)),comptype, compname))
+    outwave.writeframes(cut_data)
+    outwave.close()
+
+if __name__ == '__main__':
+    for i in range(len(df)):
+        t_begin=get_s_time(list(df['h_begin'])[i],list(df['m_begin'])[i],list(df['s_begin'])[i])
+        t_end = get_s_time(list(df['h_end'])[i], list(df['m_end'])[i], list(df['s_end'])[i])
+        cut_voice(t_p[0],name_list[i],t_begin,t_end)
+    t_1 = time.time()
+    print('\n全程耗时：%.2fs' % (t_1 - t_0))
+
